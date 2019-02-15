@@ -37,6 +37,7 @@ class Agent():
         self.qnetwork_local = QNetwork(state_size, action_size, seed).to(device)
         self.qnetwork_target = QNetwork(state_size, action_size, seed).to(device)
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
+        self.criterion = torch.nn.MSELoss()
 
         # Replay memory
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
@@ -80,14 +81,24 @@ class Agent():
 
         Params
         ======
-            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
+            experiences (Tuple[torch.Variable]): tuple of (s, a, r, s', done) tuples 
             gamma (float): discount factor
         """
         states, actions, rewards, next_states, dones = experiences
 
         ## TODO: compute and minimize the loss
         "*** YOUR CODE HERE ***"
-
+        self.optimizer.zero_grad()
+        
+        next_rewards = self.qnetwork_target.forward(next_states).detach().max(dim=1)[0].unsqueeze(1)
+        
+        target = rewards + gamma * next_rewards * (1 - dones)
+        
+        estimate = self.qnetwork_local.forward(states).gather(1, actions)
+        
+        loss = self.criterion(estimate, target)
+        loss.backward()
+        self.optimizer.step()
         # ------------------- update target network ------------------- #
         self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)                     
 
